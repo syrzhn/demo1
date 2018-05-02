@@ -34,6 +34,7 @@ public class ReadersWritersMultiThreading {
 		 */
 		public  String read(Task process) {
 			String name = process.getTaskName();
+			Integer key = process.getKey();
 			try {
 				synchronized(this) {
 					print(name + " is beginning to read the " + resource);
@@ -48,7 +49,8 @@ public class ReadersWritersMultiThreading {
 			}
 			finally {
 				synchronized(this) {
-					mReaders.remove(process.getKey()); 
+					mReaders.remove(key);
+					process.setButtonView("Start \"Reader" + key +"\""); 
 					print(name + " was ended to read the " + resource + " and unloaded");
 					if (mReaders.size() == 0)
 						this.notifyAll();
@@ -63,6 +65,7 @@ public class ReadersWritersMultiThreading {
 		 */
 		public synchronized String write(Task process){
 			String name = process.getTaskName();
+			Integer key = process.getKey();
 			try {
 				while (!mReaders.isEmpty()) 
 					this.wait();
@@ -77,7 +80,8 @@ public class ReadersWritersMultiThreading {
 				print(name + " is interrupted");
 			}
 			finally {
-				mWriters.remove(process.getKey()); 
+				mWriters.remove(key);
+				process.setButtonView("Start \"Writer" + key +"\"");
 				print(name + " was ended to read the " + resource + " and unloaded");
 				this.notifyAll();
 			}
@@ -102,6 +106,8 @@ public class ReadersWritersMultiThreading {
 		public Task(Integer number) { mNumber = number; };
 		/** Paints progress of the task on a his own progress bar */
 		abstract void  setProgressView(Integer prog);
+		/** Sets caption on the button starts/stops the task */
+		abstract void  setButtonView(String caption);
 		/** Gets name of the task */
 		public String  getTaskName() { return mName; }
 		/** Gets thread of the task */
@@ -122,7 +128,11 @@ public class ReadersWritersMultiThreading {
 		}
 		@Override
 		public void setProgressView(Integer prog) {
-			setProgress(prog, mViewer.readerViewers.get(mNumber).bar);
+			setProgress(prog, progBarsRead[mNumber]);
+		}
+		@Override
+		void setButtonView(String caption) {
+			setButton(caption, btnsRead[mNumber]);
 		}
 	}
 	/** Writer */
@@ -137,7 +147,11 @@ public class ReadersWritersMultiThreading {
 		}
 		@Override
 		public void setProgressView(Integer prog) {
-			setProgress(prog, mViewer.writerViewers.get(mNumber).bar);
+			setProgress(prog, progBarsWrite[mNumber]);
+		}
+		@Override
+		void setButtonView(String caption) {
+			setButton(caption, btnsWrite[mNumber]);
 		}
 	}	
 	/**
@@ -157,6 +171,18 @@ public class ReadersWritersMultiThreading {
 	public void setProgress(Integer prog, ProgressBar bar) {
 		display.asyncExec(() -> { 
 			bar.setSelection(prog);
+			"".toCharArray();
+			});			
+	}
+	/**
+	 * Sets caption on the button
+	 * from any thread
+	 * @param caption - caption
+	 * @param button  - button 
+	 */
+	public void setButton(String caption, Button button) {
+		display.asyncExec(() -> { 
+			button.setText(caption);
 			"".toCharArray();
 			});			
 	}
@@ -201,34 +227,18 @@ public class ReadersWritersMultiThreading {
 	 * for connection between any task and SWT main form  
 	 */
 	class Viewer {
-		public Map<Integer, TaskViewer> readerViewers, writerViewers;
-		public Viewer() {
-			readerViewers = new HashMap<Integer, TaskViewer>();
-			writerViewers = new HashMap<Integer, TaskViewer>();
-		}
 		public TaskViewer getReaderButtonAction(Integer i) {
-			if (readerViewers.containsKey(i))
-				return readerViewers.get(i);
-			else {
 				TaskViewer s = new ReaderViewer(i);
-				readerViewers.put(i, s);
 				return s;
-			}
 		}
 		public TaskViewer getWriterButtonAction(Integer i) {
-			if (writerViewers.containsKey(i))
-				return writerViewers.get(i);
-			else {
 				TaskViewer s = new WriterViewer(i);
-				writerViewers.put(i, s);
 				return s;
-			}
 		}
 		abstract class TaskViewer implements SelectionListener {
-			public Boolean isStartedNow = false;
+			public Boolean isStartedNow;
 			public Button button;
 			public Integer number;
-			public ProgressBar bar; // Everytime's fresh drinks
 			public TaskViewer(Integer i) { number = i; }
 			@Override
 			public void widgetDefaultSelected(SelectionEvent e) {}
@@ -239,7 +249,6 @@ public class ReadersWritersMultiThreading {
 			}
 			@Override
 			public void widgetSelected(SelectionEvent e) {
-				bar = progBarsRead[number];
 				button = (Button)e.getSource();
 				if (!isStartedNow) {
 					startReader(number);
@@ -258,7 +267,6 @@ public class ReadersWritersMultiThreading {
 			}
 			@Override
 			public void widgetSelected(SelectionEvent e) {
-				bar = progBarsWrite[number];
 				button = (Button)e.getSource();
 				if (!isStartedNow) {
 					startWriter(number);
@@ -282,6 +290,8 @@ public class ReadersWritersMultiThreading {
 		createContents();		
 		progBarsRead = new ProgressBar[] { progressBar3, progressBar4, progressBar5 }; 
 		progBarsWrite = new ProgressBar[] { progressBar1, progressBar2 };
+		btnsRead = new Button[] { btnStartReader0, btnStartReader1, btnStartReader2 };
+		btnsWrite = new Button[] { btnStartWriter0, btnStartReader1 };
 		shell.open();
 		shell.layout();
 		while (!shell.isDisposed()) {
@@ -305,6 +315,8 @@ public class ReadersWritersMultiThreading {
 	private Button btnStartReader0;
 	private Button btnStartReader1;
 	private Button btnStartReader2;
+	private Button btnsRead[];  // and any buttons to manage the threads
+	private Button btnsWrite[];
 	/**Launch the application.
 	 * @param args*/
 	public static void main(String[] args) {
